@@ -11,19 +11,19 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Este microservicio vive detrás del BFF y del API Gateway, que ya
- * validan el JWT. Pero se vuelve a validar acá (defensa en
- * profundidad): si alguna vez el API Gateway apunta directo a este
- * servicio, no debe quedar abierto solo porque el BFF esté bien
- * configurado.
- */
 @Component
 public class RolesConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+
+    private static final String ROL_POR_DEFECTO = "PACIENTE";
+
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
         List<String> roles = jwt.getClaimAsStringList("roles");
-        List<GrantedAuthority> authorities = (roles == null ? List.<String>of() : roles).stream()
+        if (roles == null || roles.isEmpty()) {
+            roles = List.of(ROL_POR_DEFECTO);
+        }
+
+        List<GrantedAuthority> authorities = roles.stream()
                 .map(r -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + r.toUpperCase()))
                 .collect(Collectors.toList());
 

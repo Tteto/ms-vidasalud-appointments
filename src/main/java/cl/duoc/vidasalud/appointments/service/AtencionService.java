@@ -51,8 +51,7 @@ public class AtencionService {
                 request.paciente(),
                 request.prestacion(),
                 request.boxId(),
-                request.fecha()
-        );
+                request.fecha());
         return repository.save(atencion);
     }
 
@@ -80,11 +79,25 @@ public class AtencionService {
 
         if (!permitidos.contains(nuevoEstado)) {
             throw new TransicionInvalidaException(
-                    "No se puede pasar de " + atencion.getEstado() + " a " + nuevoEstado
-            );
+                    "No se puede pasar de " + atencion.getEstado() + " a " + nuevoEstado);
         }
 
         atencion.setEstado(nuevoEstado);
         return repository.save(atencion);
+    }
+
+    public Atencion obtenerDePaciente(Long id, String pacienteId) {
+        Atencion atencion = obtener(id);
+        if (!atencion.getPacienteId().equals(pacienteId)) {
+            throw new AtencionNoEncontradaException(id);
+        }
+        return atencion;
+    }
+
+    public List<Atencion> listarDePaciente(String pacienteId, EstadoAtencion estado,
+            LocalDateTime desde, LocalDateTime hasta) {
+        return listar(estado, desde, hasta).stream()
+                .filter(a -> a.getPacienteId().equals(pacienteId))
+                .toList();
     }
 }
