@@ -5,6 +5,7 @@ import cl.duoc.vidasalud.appointments.entity.Atencion;
 import cl.duoc.vidasalud.appointments.entity.EstadoAtencion;
 import cl.duoc.vidasalud.appointments.exception.AtencionNoEncontradaException;
 import cl.duoc.vidasalud.appointments.exception.TransicionInvalidaException;
+import cl.duoc.vidasalud.appointments.messaging.PublicadorEventos;
 import cl.duoc.vidasalud.appointments.repository.AtencionRepository;
 import org.springframework.stereotype.Service;
 
@@ -40,9 +41,11 @@ public class AtencionService {
     }
 
     private final AtencionRepository repository;
+    private final PublicadorEventos publicador;
 
-    public AtencionService(AtencionRepository repository) {
+    public AtencionService(AtencionRepository repository, PublicadorEventos publicador) {
         this.repository = repository;
+        this.publicador = publicador;
     }
 
     public Atencion crear(CrearAtencionRequest request) {
@@ -51,13 +54,35 @@ public class AtencionService {
                 request.paciente(),
                 request.prestacion(),
                 request.boxId(),
-                request.fecha());
-        return repository.save(atencion);
+                request.fecha()
+        );
+        Atencion guardada = repository.save(atencion);
+        publicador.publicar(guardada);
+        return guardada;
     }
 
     public Atencion obtener(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new AtencionNoEncontradaException(id));
+    }
+
+    /**
+     * Para pacientes: si la atención no es suya responde 404 (no 403), así no
+     * se revela que existe.
+     */
+    public Atencion obtenerDePaciente(Long id, String pacienteId) {
+        Atencion atencion = obtener(id);
+        if (!atencion.getPacienteId().equals(pacienteId)) {
+            throw new AtencionNoEncontradaException(id);
+        }
+        return atencion;
+    }
+
+    public List<Atencion> listarDePaciente(String pacienteId, EstadoAtencion estado,
+                                           LocalDateTime desde, LocalDateTime hasta) {
+        return listar(estado, desde, hasta).stream()
+                .filter(a -> a.getPacienteId().equals(pacienteId))
+                .toList();
     }
 
     public List<Atencion> listar(EstadoAtencion estado, LocalDateTime desde, LocalDateTime hasta) {
@@ -79,25 +104,13 @@ public class AtencionService {
 
         if (!permitidos.contains(nuevoEstado)) {
             throw new TransicionInvalidaException(
-                    "No se puede pasar de " + atencion.getEstado() + " a " + nuevoEstado);
+                    "No se puede pasar de " + atencion.getEstado() + " a " + nuevoEstado
+            );
         }
 
         atencion.setEstado(nuevoEstado);
-        return repository.save(atencion);
-    }
-
-    public Atencion obtenerDePaciente(Long id, String pacienteId) {
-        Atencion atencion = obtener(id);
-        if (!atencion.getPacienteId().equals(pacienteId)) {
-            throw new AtencionNoEncontradaException(id);
-        }
-        return atencion;
-    }
-
-    public List<Atencion> listarDePaciente(String pacienteId, EstadoAtencion estado,
-            LocalDateTime desde, LocalDateTime hasta) {
-        return listar(estado, desde, hasta).stream()
-                .filter(a -> a.getPacienteId().equals(pacienteId))
-                .toList();
+        Atencion actualizada = repository.save(atencion);
+        publicador.publicar(actualizada);
+        return actualizada;
     }
 }

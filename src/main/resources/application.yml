@@ -11,8 +11,23 @@ spring:
         jwt:
           issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0
 
+  rabbitmq:
+    # Los dos nodos del cluster: si uno cae, el cliente se conecta al otro
+    addresses: ${RABBIT_ADDRESSES:localhost:5672}
+    username: ${RABBIT_USER:guest}
+    password: ${RABBIT_PASS:guest}
+    # Si RabbitMQ no responde, no dejar esperando la petición del usuario
+    connection-timeout: 3s
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+
+# Nombres centralizados de RabbitMQ (productor)
+app:
+  rabbit:
+    exchange-atenciones: vidasalud.atenciones
+    # routing key = prefijo + estado en minúsculas (ej: atencion.confirmada)
+    prefijo-routing-key: atencion.
 
 ---
 spring:
